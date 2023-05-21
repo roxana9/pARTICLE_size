@@ -10,6 +10,7 @@ import easyocr
 class scale_line():
     """return scalebar in suitable unit
     scale=unit*pixel /length
+   
     """
     def __init__ (self,img):
         self.image=img
