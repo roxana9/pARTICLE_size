@@ -1,1 +1,79 @@
 
+import os
+import PIL
+from PIL import ImageOps
+import numpy as np
+from keras.layers import Input, Conv2D
+from keras.models import Model
+from sklearn.model_selection import train_test_split
+print("loading dataset")
+X_train=np.load('/kaggle/input/particle-array-2/dataset_array_2/x_train_gray')
+mask_train =np.load('/kaggle/input/particle-array-2/dataset_array_2/mask_train')
+X_val =np.load('/kaggle/input/particle-array-2/dataset_array_2/x_val_gray')
+mask_val=np.load('/kaggle/input/particle-array-2/dataset_array_2/mask_val')
+X_test=np.load('/kaggle/input/particle-array-2/dataset_array_2/x_test_gray')
+mask_test=np.load('/kaggle/input/particle-array-2/dataset_array_2/mask_test')
+X_train=np.reshape(X_train,(len(X_train),256,256,1))
+mask_train=np.reshape(mask_train,(len(mask_train),256,256,1))
+X_val=np.reshape(X_val,(len(X_val),256,256,1))
+mask_val=np.reshape(mask_val,(len(mask_val),256,256,1))
+X_test=np.reshape(X_test,(len(X_test),256,256,1))
+mask_test=np.reshape(mask_test,(len(mask_test),256,256,1))
+img_size = (256,256)
+num_classes = 2
+batch_size = 16
+print("training")
+from IPython.display import Image, display
+#import PIL
+#from PIL import ImageOps
+import cv2
+# Display input image #7
+#display(Image(filename=input_img_paths[9]))
+#import tensorflow as tf
+# Display auto-contrast version of corresponding target (per-pixel categories)
+
+#from tensorflow import keras
+
+smooth=1
+import keras
+import segmentation_models as sm
+
+BACKBONE = 'vgg16'
+preprocess_input = sm.get_preprocessing(BACKBONE)
+#keras.utils.generic_utils() = keras.utils()
+#from segmentation_models import Unet
+from segmentation_models.losses import bce_jaccard_loss
+from segmentation_models.metrics import iou_score
+#model = sm.Unet(BACKBONE, encoder_weights='imagenet',input_shape=(None, None, 3))
+base_model = sm.Linknet(BACKBONE, encoder_weights='imagenet',input_shape=(None, None, 3))
+for layer in base_model.layers:
+  if layer.name == 'sigmoid':
+    break
+  layer.trainable = False
+ # print('Layer ' + layer.name + ' frozen.')
+inp = Input(shape=(None, None, 1))
+l1 = Conv2D(3, (1, 1))(inp) # map N channels data to 3 channels
+out = base_model(l1)
+
+model = Model(inp, out, name=base_model.name)
+model.summary()
+
+from tensorflow.keras.optimizers import Adam, RMSprop,SGD
+model.compile('Adam', loss=bce_jaccard_loss, metrics=[iou_score,'accuracy'])
+# fit model
+history=model.fit(
+    x=X_train,
+    y=mask_train,
+    batch_size=16,
+    epochs=500
+)
+
+score = model.evaluate(X_test,mask_test, verbose=1)
+model_json = model.to_json()
+with open("modelseg.json", "w") as json_file:
+    json_file.write(model_json)
+# serialize weights to HDF5
+#model.save("modelseg_new2.h5")
+
+
+print("Saved model to disk")
